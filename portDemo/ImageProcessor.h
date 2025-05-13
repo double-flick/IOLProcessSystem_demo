@@ -29,7 +29,4 @@ public:
 	*/
 	static cv::Mat DecodeImage(const std::vector<uchar>& data);
 
-private:
-	// 生成唯一ID（示例：时间戳+随机数）
-	static std::string GenerateImageId(const std::string& prefix);
 };
