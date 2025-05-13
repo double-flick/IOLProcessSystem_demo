@@ -3,14 +3,8 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
+#include "ImagePacket.h"
 
-// 包含图像数据和元信息
-struct ImagePacket {
-	std::vector<uchar> encodedData;  // 编码后的图像数据
-	std::string imageId;             // 唯一标识符（如时间戳/UUID）
-	int width = 0;                   // 图像宽（可选）
-	int height = 0;                  // 图像高（可选）
-};
 
 class ImageProcessor {
 public:

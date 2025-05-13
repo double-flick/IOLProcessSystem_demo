@@ -1,53 +1,48 @@
+#include "FileDataSource.h"
+#include "ImageProcessor.h"
+#include "NetworkManager.h"
+#include "ProtocolSender.h"
+#include "ImagePacket.h"
 #include <iostream>
-#include <cstring>
-#include <winsock2.h>
-#include <ws2tcpip.h>  // 新增
-#include <opencv2/opencv.hpp>
-
-#pragma comment(lib, "ws2_32.lib")
+#include <thread>
+#include <chrono>
 
 int main() {
-	WSADATA wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		std::cerr << "WSAStartup failed." << std::endl;
-		return 1;
+	// 设置图像文件夹路径
+	std::string folderPath = "E:/WORK/mvs/projects/senderDemo/portDemo/imagetest";
+
+	// 创建数据源
+	FileDataSource dataSource(folderPath);
+
+	// 创建网络管理器
+	NetworkManager networkManager;
+	if (!networkManager.Connect("127.0.0.1", 9999)) {
+		std::cerr << "Failed to connect to the server" << std::endl;
+		return -1;
 	}
 
-	SOCKET clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (clientSocket == INVALID_SOCKET) {
-		std::cerr << "Socket creation failed." << std::endl;
-		WSACleanup();
-		return 1;
+	// 创建协议发送器
+	ProtocolSender protocolSender(networkManager);
+
+	// 传输文件夹中的所有图像
+	while (true) {
+		std::pair<cv::Mat, std::string> imagePair = dataSource.GetNextImage();
+		if (imagePair.first.empty()) {
+			break; // 如果没有更多图像，退出循环
+		}
+
+		// 编码图像
+		ImagePacket packet = ImageProcessor::EncodeImage(imagePair.first, imagePair.second);
+
+		// 发送图像
+		protocolSender.Send(packet);
+
+		// 等待一段时间再发送下一张图像
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 
-	sockaddr_in serverAddr;
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons(9999);
-	inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);  // 修改处
+	// 断开连接
+	networkManager.Disconnect();
 
-	if (connect(clientSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-		std::cerr << "Connect failed." << std::endl;
-		closesocket(clientSocket);
-		WSACleanup();
-		return 1;
-	}
-
-	cv::Mat image = cv::imread("E:/WORK/mvs/projects/senderDemo/portDemo/imagetest/ddj.jpg");
-	if (image.empty()) {
-		std::cerr << "Failed to read image." << std::endl;
-		closesocket(clientSocket);
-		WSACleanup();
-		return 1;
-	}
-
-	std::vector<uchar> buffer;
-	cv::imencode(".jpg", image, buffer);
-
-	int dataSize = buffer.size();
-	send(clientSocket, (const char*)&dataSize, sizeof(dataSize), 0);
-	send(clientSocket, (const char*)buffer.data(), dataSize, 0);
-
-	closesocket(clientSocket);
-	WSACleanup();
 	return 0;
 }

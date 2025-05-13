@@ -7,11 +7,12 @@ ImagePacket ImageProcessor::EncodeImage(const cv::Mat& image, const std::string&
 	ImagePacket packet;
 
 	// 编码为JPEG（可调整质量参数）
-	cv::imencode(".jpg", image, packet.encodedData, { cv::IMWRITE_JPEG_QUALITY, 90 });
+	cv::imencode(".jpg", image, packet.data, { cv::IMWRITE_JPEG_QUALITY, 90 });
+
+	// 设置数据长度
+	packet.dataSize = packet.data.size(); // 设置数据长度为编码后数据的大小
 
 	// 记录图像信息
-	packet.width = image.cols;
-	packet.height = image.rows;
 	packet.imageId = id;
 
 	return packet;

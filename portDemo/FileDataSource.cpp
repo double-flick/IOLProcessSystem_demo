@@ -4,7 +4,15 @@
 #include <iostream>
 
 FileDataSource::FileDataSource(const std::string& folderPath)
-	: _folderPath(folderPath) {}
+	: _folderPath(folderPath) {
+	LoadImages();
+
+	// 打印文件夹路径和文件列表
+	std::cout << "Folder path: " << _folderPath << std::endl;
+	for (const auto& file : _imageFiles) {
+		std::cout << "Image file: " << file << std::endl;
+	}
+}
 
 cv::Mat FileDataSource::_FetchRawImage() {
 	if (_imageFiles.empty()) {
