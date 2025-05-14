@@ -16,7 +16,7 @@ int main() {
 
 	// 创建网络管理器
 	NetworkManager networkManager;
-	if (!networkManager.Connect("127.0.0.1", 9999)) {
+	if (!networkManager.Connect("172.27.246.211", 9999)) {
 		std::cerr << "Failed to connect to the server" << std::endl;
 		return -1;
 	}
@@ -38,7 +38,7 @@ int main() {
 		protocolSender.Send(packet);
 
 		// 等待一段时间再发送下一张图像
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	}
 
 	// 断开连接
