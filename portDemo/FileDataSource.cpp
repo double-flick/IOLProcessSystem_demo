@@ -36,7 +36,7 @@ cv::Mat FileDataSource::_FetchRawImage() {
 void FileDataSource::LoadImages() {
 	// 获取文件夹中的所有图像文件
 	for (const auto& entry : std::experimental::filesystem::directory_iterator(_folderPath)) {
-		if (entry.path().extension() == ".jpg") {
+		if (entry.path().extension() == ".png") {
 			_imageFiles.push_back(entry.path().filename().string());
 		}
 	}

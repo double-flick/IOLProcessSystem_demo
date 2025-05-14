@@ -4,12 +4,13 @@
 #include "ProtocolSender.h"
 #include "ProtocolReceiver.h"
 #include "PointsPacket.h"
+#include "PointsProcessor.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
 
 
-// 回调函数，用于处理接收到的 PointsPacket
+// 测试用回调函数，用于处理接收到的 PointsPacket并打印坐标点
 void OnPointsPacketReceived(const PointsPacket& packet) {
     std::cout << "Received PointsPacket for image ID: " << packet.imageId << std::endl;
     for (const auto& point : packet.points) {
@@ -19,7 +20,7 @@ void OnPointsPacketReceived(const PointsPacket& packet) {
 
 int main() {
 	// 设置图像文件夹路径
-	std::string folderPath = "E:/WORK/mvs/projects/senderDemo/portDemo/imagetest";
+	std::string folderPath = "E:/WORK/mvs/projects/senderDemo/portDemo/imagetest2";
 
 	// 创建数据源
 	FileDataSource dataSource(folderPath);
@@ -37,8 +38,16 @@ int main() {
 	// 创建协议接收器
 	ProtocolReceiver protocolReceiver(networkManager);
 
+	// 设置输出目录（可以改为您想要的路径）
+	std::string outputFolder = "E:/WORK/mvs/projects/senderDemo/portDemo/processed_images";
+
+	// 创建PointsProcessor实例
+	PointsProcessor pointsProcessor(dataSource, outputFolder);
+
 	// 设置消息回调函数
-	protocolReceiver.SetMessageCallback(OnPointsPacketReceived);
+	protocolReceiver.SetMessageCallback([&pointsProcessor](const PointsPacket& packet) {
+		pointsProcessor.ProcessPointsPacket(packet);
+	});
 
 	// 传输文件夹中的所有图像
 	while (true) {
