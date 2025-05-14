@@ -1,6 +1,17 @@
 #include "ProtocolReceiver.h"
 #include <cstring>
 #include <algorithm> // 包含 std::find
+#include <iostream>
+#include <cstdint>
+#include <cstring>
+
+
+//python平台默认大端int类型，cpp平台默认小端，需要做转换
+int32_t ntoh_int32(const void* data) {
+	uint32_t value;
+	std::memcpy(&value, data, sizeof(value));
+	return static_cast<int32_t>(ntohl(value));
+}
 
 ProtocolReceiver::ProtocolReceiver(NetworkManager& networkManager)
 	: _networkManager(networkManager), _bytesToReceive(sizeof(int32_t)), _isHeaderReceived(false) {
@@ -22,41 +33,74 @@ void ProtocolReceiver::OnDataReceived(const std::vector<char>& data) {
 			// 解析数据长度
 			int32_t dataSize;
 			std::memcpy(&dataSize, _buffer.data(), sizeof(dataSize));
-			_bytesToReceive = sizeof(dataSize) + dataSize + 1; // 包括字符串结束符
+			dataSize = ntohl(dataSize); // 网络字节序转本地字节序
+			_bytesToReceive = sizeof(int32_t) + dataSize; // 总长度 = 头部(4) + 数据长度
 			_isHeaderReceived = true;
+
+			std::cout << "Header received, data size: " << dataSize
+				<< ", Total bytes to receive: " << _bytesToReceive << std::endl;
+
+			continue; // 继续循环处理当前 buffer
 		}
 
 		if (_buffer.size() >= _bytesToReceive) {
 			// 解析完整的坐标点数据包
 			PointsPacket packet;
 
-			// 解析数据长度
-			int32_t dataSize;
-			std::memcpy(&dataSize, _buffer.data(), sizeof(dataSize));
+			// 获取 buffer 起始地址
+			const char* pBuffer = _buffer.data();
+			const char* pPayload = pBuffer + sizeof(int32_t); // 跳过数据长度字段
+
+															  // 打印整个 buffer（用于比对）
+			//std::cout << "Received buffer (hex): ";
+			//for (size_t i = 0; i < _bytesToReceive; ++i) {
+			//	printf("%02X ", static_cast<unsigned char>(_buffer[i]));
+			//}
+			//printf("\n");
 
 			// 解析图像ID
-			auto it = std::find(_buffer.begin() + sizeof(dataSize), _buffer.end(), '\0');
-			if (it == _buffer.end()) {
-				// 如果没有找到字符串结束符，说明数据不完整
+			const char* pIdStart = pPayload;
+			const char* pNull = reinterpret_cast<const char*>(std::memchr(pIdStart, '\0', _bytesToReceive - sizeof(int32_t)));
+			if (!pNull) {
+				std::cerr << "Error: No null terminator found in buffer" << std::endl;
 				break;
 			}
-			size_t idSize = it - (_buffer.begin() + sizeof(dataSize));
-			packet.imageId.assign(_buffer.begin() + sizeof(dataSize), it);
-			_buffer.erase(_buffer.begin(), it + 1); // 移除图像ID和字符串结束符
 
-													// 解析坐标点数据
-			size_t pointsSize = dataSize / (2 * sizeof(float)); // 每个点有两个float值
-			packet.points.resize(pointsSize);
-			for (size_t i = 0; i < pointsSize; ++i) {
-				float x, y;
-				std::memcpy(&x, _buffer.data() + i * 2 * sizeof(float), sizeof(float));
-				std::memcpy(&y, _buffer.data() + i * 2 * sizeof(float) + sizeof(float), sizeof(float));
+			packet.imageId = std::string(pIdStart, pNull);
+			std::cout << "Parsed imageId: " << packet.imageId << std::endl;
+
+			// 解析坐标点
+			const char* pPointsStart = pNull + 1;
+
+			//std::cout << "pPointsStart address: " << static_cast<const void*>(pPointsStart) << std::endl;
+			//std::cout << "Bytes at pPointsStart (hex): ";
+			//for (int i = 0; i < 16; ++i) {
+			//	printf("%02X ", static_cast<unsigned char>(pPointsStart[i]));
+			//}
+			//printf("\n");
+
+			size_t pointsBufferSize = _bytesToReceive - (pPointsStart - _buffer.data());
+			size_t pointsCount = pointsBufferSize / (2 * sizeof(int32_t)); // 每个点两个 int32_t
+
+			packet.points.resize(pointsCount);
+
+			for (size_t i = 0; i < pointsCount; ++i) {
+				const char* pointData = pPointsStart + i * 2 * sizeof(int32_t);
+
+				int32_t x = ntoh_int32(pointData);
+				int32_t y = ntoh_int32(pointData + sizeof(int32_t));
+
 				packet.points[i] = { x, y };
-			}
-			_buffer.erase(_buffer.begin(), _buffer.begin() + dataSize); // 移除坐标点数据
 
-																		// 调用消息回调函数
+				//std::cout << "Point[" << i << "] at " << static_cast<const void*>(pointData)
+				//	<< " -> x: " << x << ", y: " << y << std::endl;
+			}
+
+			// 调用消息回调函数
 			ProcessMessage(packet);
+
+			// 移除已处理的数据
+			_buffer.erase(_buffer.begin(), _buffer.begin() + _bytesToReceive);
 
 			// 重置状态
 			_bytesToReceive = sizeof(int32_t);
@@ -64,6 +108,8 @@ void ProtocolReceiver::OnDataReceived(const std::vector<char>& data) {
 		}
 	}
 }
+
+
 
 void ProtocolReceiver::ProcessMessage(const PointsPacket& message) {
 	if (_messageCallback) {
