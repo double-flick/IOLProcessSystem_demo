@@ -2,16 +2,18 @@
 #include <opencv2/opencv.hpp>
 #include <filesystem>
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 FileDataSource::FileDataSource(const std::string& folderPath)
 	: _folderPath(folderPath) {
 	LoadImages();
 
-	// 打印文件夹路径和文件列表
-	std::cout << "Folder path: " << _folderPath << std::endl;
-	for (const auto& file : _imageFiles) {
-		std::cout << "Image file: " << file << std::endl;
-	}
+	//// 打印文件夹路径和文件列表
+	//std::cout << "Folder path: " << _folderPath << std::endl;
+	//for (const auto& file : _imageFiles) {
+	//	std::cout << "Image file: " << file << std::endl;
+	//}
 }
 
 cv::Mat FileDataSource::_FetchRawImage() {
@@ -29,6 +31,9 @@ cv::Mat FileDataSource::_FetchRawImage() {
 	if (image.empty()) {
 		std::cerr << "Failed to load image: " << filePath << std::endl;
 	}
+
+	// 在加载下一张图片之前等待1秒
+	std::this_thread::sleep_for(std::chrono::seconds(2));
 
 	return image;
 }

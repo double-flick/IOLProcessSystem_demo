@@ -67,7 +67,7 @@ void ProtocolReceiver::OnDataReceived(const std::vector<char>& data) {
 			}
 
 			packet.imageId = std::string(pIdStart, pNull);
-			std::cout << "Parsed imageId: " << packet.imageId << std::endl;
+			//std::cout << "Parsed imageId: " << packet.imageId << std::endl;
 
 			// ½âÎö×ø±êµã
 			const char* pPointsStart = pNull + 1;
@@ -109,6 +109,59 @@ void ProtocolReceiver::OnDataReceived(const std::vector<char>& data) {
 	}
 }
 
+
+//void ProtocolReceiver::OnDataReceived(const std::vector<char>& data) {
+//	_buffer.insert(_buffer.end(), data.begin(), data.end());
+//
+//	while (_buffer.size() >= _bytesToReceive) {
+//		if (!_isHeaderReceived) {
+//			int32_t dataSize;
+//			std::memcpy(&dataSize, _buffer.data(), sizeof(dataSize));
+//			dataSize = ntohl(dataSize);
+//			_bytesToReceive = sizeof(int32_t) + dataSize;
+//			_isHeaderReceived = true;
+//
+//			std::cout << "Header received, data size: " << dataSize
+//				<< ", Total bytes to receive: " << _bytesToReceive << std::endl;
+//
+//			continue;
+//		}
+//
+//		if (_buffer.size() >= _bytesToReceive) {
+//			PointsPacket packet;
+//
+//			const char* pBuffer = _buffer.data();
+//			const char* pPayload = pBuffer + sizeof(int32_t);
+//
+//			const char* pNull = reinterpret_cast<const char*>(std::memchr(pPayload, '\0', _bytesToReceive - sizeof(int32_t)));
+//			if (!pNull) {
+//				std::cerr << "Error: No null terminator found in buffer" << std::endl;
+//				break;
+//			}
+//
+//			packet.imageId = std::string(pPayload, pNull);
+//			std::cout << "Parsed imageId: " << packet.imageId << std::endl;
+//
+//			const char* pPointsStart = pNull + 1;
+//			size_t pointsBufferSize = _bytesToReceive - (pPointsStart - pBuffer);
+//			size_t pointsCount = pointsBufferSize / (2 * sizeof(int32_t));
+//
+//			packet.points.resize(pointsCount);
+//			for (size_t i = 0; i < pointsCount; ++i) {
+//				const char* pointData = pPointsStart + i * 2 * sizeof(int32_t);
+//				int32_t x = ntoh_int32(pointData);
+//				int32_t y = ntoh_int32(pointData + sizeof(int32_t));
+//				packet.points[i] = { x, y };
+//			}
+//
+//			ProcessMessage(packet);
+//
+//			_buffer.erase(_buffer.begin(), _buffer.begin() + _bytesToReceive);
+//			_bytesToReceive = sizeof(int32_t);
+//			_isHeaderReceived = false;
+//		}
+//	}
+//}
 
 
 void ProtocolReceiver::ProcessMessage(const PointsPacket& message) {

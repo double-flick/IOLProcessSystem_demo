@@ -25,6 +25,9 @@ bool NetworkManager::Connect(const std::string& ip, int port) {
 		if (_errorCallback) _errorCallback("Socket creation failed");
 		return false;
 	}
+	// 禁用Nagle算法
+	int flag = 1;
+	setsockopt(_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
 
 	// 设置服务器地址
 	sockaddr_in serverAddr{};

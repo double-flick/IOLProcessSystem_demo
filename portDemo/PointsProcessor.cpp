@@ -23,27 +23,30 @@ void PointsProcessor::ProcessPointsPacket(const PointsPacket& packet) {
 	}
 
 	// 2. 创建图像副本用于绘制（避免修改缓存中的原图）
-	cv::Mat imageWithPoints = originalImage.clone();
+	//cv::Mat imageWithPoints = originalImage.clone();
 
-	// 3. 绘制坐标点到图像上
-	DrawPointsOnImage(packet, imageWithPoints);
+	//// 3. 绘制坐标点到图像上
+	//DrawPointsOnImage(packet, imageWithPoints);
 
-	// 4. 生成保存路径并保存图像
-	std::string outputPath = GenerateOutputPath(packet.imageId);
-	std::cout << "输出路径: " << outputPath << std::endl;
-	if (!cv::imwrite(outputPath, imageWithPoints)) {
-		std::cerr << "错误：无法保存图像到 " << outputPath << std::endl;
-	}
-	else {
-		std::cout << "已保存处理后的图像到: " << outputPath << std::endl;
-	}
+	//// 4. 生成保存路径并保存图像
+	//std::string outputPath = GenerateOutputPath(packet.imageId);
+	////std::cout << "输出路径: " << outputPath << std::endl;
+	//if (!cv::imwrite(outputPath, imageWithPoints)) {
+	//	std::cerr << "错误：无法保存图像到 " << outputPath << std::endl;
+	//}
+	//else {
+	//	//std::cout << "已保存处理后的图像到: " << outputPath << std::endl;
+	//}
 
 	// 5. 释放缓存
 	_dataSource.ReleaseImage(packet.imageId);
 
-	// 6. 显示图像（可选）
+	// 6. 记录并输出处理耗时
+	LogProcessingTime(packet.imageId);
+
+	// 7. 显示图像（可选）
 	//cv::imshow("处理结果预览", imageWithPoints);
-	cv::waitKey(1);
+	//cv::waitKey(1);
 }
 
 void PointsProcessor::DrawPointsOnImage(const PointsPacket& packet, cv::Mat& image) {
@@ -81,4 +84,24 @@ void PointsProcessor::DrawPointsOnImage(const PointsPacket& packet, cv::Mat& ima
 std::string PointsProcessor::GenerateOutputPath(const std::string& imageId) const {
 	// 生成形如：output_folder/image_id_points.jpg 的路径
 	return _outputFolder + "/" + imageId + "_points.jpg";
+}
+
+// 新增方法：计算并输出处理耗时
+void PointsProcessor::LogProcessingTime(const std::string& imageId) {
+	// 获取当前时间戳
+	auto now = std::chrono::high_resolution_clock::now();
+	auto nowTime = now.time_since_epoch().count();
+
+	// 获取图片ID中的时间戳
+	// 使用std::stoull确保可以处理更大的数字
+	uint64_t imageIdTime = std::stoull(imageId);
+
+	// 计算耗时（单位：纳秒）
+	auto processingTime = nowTime - imageIdTime;
+
+	// 转换为秒
+	double processingTimeInSeconds = static_cast<double>(processingTime) / 1e9;
+
+	// 输出耗时
+	std::cout << "处理图像 " << imageId << " 的总耗时: " << processingTimeInSeconds << " 秒" << std::endl;
 }
