@@ -4,7 +4,7 @@
 #include <iostream>
 #include <cstdint>
 #include <cstring>
-
+/*接收服务端返回的推理结果，并包装为PointPacket对象，并触发接收到数据的回调函数*/
 
 //python平台默认大端int类型，cpp平台默认小端，需要做转换
 int32_t ntoh_int32(const void* data) {

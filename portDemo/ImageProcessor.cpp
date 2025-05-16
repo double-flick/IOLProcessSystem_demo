@@ -3,6 +3,9 @@
 #include <random>
 #include <sstream>
 
+/*将图像编码，并打包为ImagePacket对象，用于后续序列化并发送
+	这里可以做修改，比如做降采样加速传输*/
+
 ImagePacket ImageProcessor::EncodeImage(const cv::Mat& image, const std::string& id) {
 	ImagePacket packet;
 

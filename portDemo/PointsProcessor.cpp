@@ -3,6 +3,9 @@
 #include <iostream>
 #include <filesystem> // 用于创建目录
 
+/*回调函数，一旦接收到数据就触发，
+将接收到的数据解码为图像id和关键点坐标后，绘制并保存到本地，用于观察推理效果*/
+
 namespace fs = std::experimental::filesystem;
 
 PointsProcessor::PointsProcessor(DataSource& dataSource, const std::string& outputFolder)

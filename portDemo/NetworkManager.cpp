@@ -3,7 +3,7 @@
 #include <iostream>
 
 #pragma comment(lib, "ws2_32.lib")
-
+/*网络控制模块，提供了基于TCP协议的连接，断开，发送数据，接收数据逻辑*/
 NetworkManager::NetworkManager() {
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {

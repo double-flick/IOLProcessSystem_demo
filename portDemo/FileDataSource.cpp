@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+/*某种程度上算是DataSource.h的子类，重写了_FetchRawImage()方法，用于从文件夹中加载图片，以模拟输入场景*/
 
 FileDataSource::FileDataSource(const std::string& folderPath)
 	: _folderPath(folderPath) {

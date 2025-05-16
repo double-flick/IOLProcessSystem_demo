@@ -2,6 +2,8 @@
 #include <cstring>
 #include <sstream>
 
+/*将需要发送的ImagePacket对象序列化，并调用NetworkManager的方法发送出去*/
+
 ProtocolSender::ProtocolSender(NetworkManager& networkManager)
 	: _networkManager(networkManager) {}
 
