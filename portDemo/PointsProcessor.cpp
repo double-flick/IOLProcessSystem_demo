@@ -25,7 +25,7 @@ void PointsProcessor::ProcessPointsPacket(const PointsPacket& packet) {
 		return;
 	}
 
-	// 2. 创建图像副本用于绘制（避免修改缓存中的原图）
+	// //2. 创建图像副本用于绘制（避免修改缓存中的原图）
 	//cv::Mat imageWithPoints = originalImage.clone();
 
 	//// 3. 绘制坐标点到图像上
