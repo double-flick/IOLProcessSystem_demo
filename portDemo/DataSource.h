@@ -16,6 +16,7 @@ class DataSource {
 public:
 	virtual ~DataSource() = default;
 
+
 	// 设置缓存容量
 	void SetCacheCapacity(size_t capacity) {
 		std::lock_guard<std::mutex> lock(_cacheMutex);
@@ -32,6 +33,8 @@ public:
 		// 获取最近最少使用的缓存项
 		std::string id = _lruCache.ReplCandidate();
 		cv::Mat image = _imageCache[id].clone();
+		_imageCache.erase(id); // 从缓存中移除
+		_lruCache.Erase(id); // 从 LRU 列表中移除
 
 		// 不移除该项，因为后续还需要通过 GetOriginalImage 获取原图
 		return{ image, id };

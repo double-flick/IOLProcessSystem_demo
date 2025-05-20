@@ -26,6 +26,7 @@ FileDataSource::~FileDataSource() {
 	}
 }
 
+//预加载线程，获取待加载的文件列表_pendingImageFiles
 void FileDataSource::LoadImagePaths() {
 	try {
 		for (const auto& entry : fs::directory_iterator(_folderPath)) {

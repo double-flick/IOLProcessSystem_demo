@@ -5,28 +5,39 @@
 #include "ProtocolReceiver.h"
 #include "PointsPacket.h"
 #include "PointsProcessor.h"
+#include "VideoDataSource.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <atomic>
 
+std::atomic<bool> g_running{ true };
 
-// 测试用回调函数，用于处理接收到的 PointsPacket并打印坐标点
 void OnPointsPacketReceived(const PointsPacket& packet) {
-    std::cout << "Received PointsPacket for image ID: " << packet.imageId << std::endl;
-    for (const auto& point : packet.points) {
-        std::cout << "Point: (" << point.first << ", " << point.second << ")" << std::endl;
-    }
+	std::cout << "Received PointsPacket for image ID: " << packet.imageId << std::endl;
+	for (const auto& point : packet.points) {
+		std::cout << "Point: (" << point.first << ", " << point.second << ")" << std::endl;
+	}
+}
+
+// 控制台输入监听线程
+void ConsoleInputThread() {
+	std::cout << "Press 'q' and Enter to stop the program..." << std::endl;
+	while (g_running) {
+		char input;
+		std::cin >> input;
+		if (input == 'q' || input == 'Q') {
+			g_running = false;
+			break;
+		}
+	}
 }
 
 int main() {
-	// 设置图像文件夹路径
-	std::string folderPath = "E:/WORK/mvs/projects/senderDemo/portDemo/imagetest2";
-
-	// 创建数据源
-	FileDataSource dataSource(folderPath);
-	// 设置缓存容量
-	dataSource.SetCacheCapacity(50); // 设置缓存容量为50
-
+	// 创建视频数据源 (10fps)
+	VideoDataSource videoSource("G:/AS-OCT/data/IOL/IOLvideos/2021-11-01_12-41-57__OCT.MP4", 1);
+	videoSource.EnableDebugOutput(true);
+	videoSource.SetCacheCapacity(100);
 
 	// 创建网络管理器
 	NetworkManager networkManager;
@@ -35,46 +46,49 @@ int main() {
 		return -1;
 	}
 
-	// 创建协议发送器
+	// 创建协议发送器和接收器
 	ProtocolSender protocolSender(networkManager);
-
-	// 创建协议接收器
 	ProtocolReceiver protocolReceiver(networkManager);
 
-	// 设置输出目录（可以改为您想要的路径）
+	// 设置输出目录
 	std::string outputFolder = "E:/WORK/mvs/projects/senderDemo/portDemo/processed_images";
-
-	// 创建PointsProcessor实例
-	PointsProcessor pointsProcessor(dataSource, outputFolder);
+	PointsProcessor pointsProcessor(videoSource, outputFolder);
 
 	// 设置消息回调函数
 	protocolReceiver.SetMessageCallback([&pointsProcessor](const PointsPacket& packet) {
 		pointsProcessor.ProcessPointsPacket(packet);
 	});
 
-	// 传输文件夹中的所有图像
-	while (true) {
-		// 先填充缓存
-		dataSource.FetchRawImageToCache();
+	// 启动控制台输入线程
+	std::thread inputThread(ConsoleInputThread);
 
-		// 然后从缓存获取图片
-		std::pair<cv::Mat, std::string> imagePair = dataSource.GetNextImage();
-		if (imagePair.first.empty()) {
-			break; // 如果没有更多图像，退出循环
+	// 主处理循环
+	while (g_running) {
+		// 尝试获取图像
+		videoSource.FetchRawImageToCache();
+		std::pair<cv::Mat, std::string> imagePair = videoSource.GetNextImage();
+
+		if (!imagePair.first.empty()) {
+			// 编码并发送图像
+			ImagePacket packet = ImageProcessor::EncodeImage(imagePair.first, imagePair.second);
+			protocolSender.Send(packet);
+		}
+		else {
+			// 缓存为空时的处理
+
+			std::cout << "Waiting for video frames..." << std::endl;
+			
+
+			// 等待一段时间再重试
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 
-		// 编码图像
-		ImagePacket packet = ImageProcessor::EncodeImage(imagePair.first, imagePair.second);
-
-		// 发送图像
-		protocolSender.Send(packet);
-
+		// 添加小的延迟防止CPU占用过高
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
 
-	// 等待接收线程结束
-	std::this_thread::sleep_for(std::chrono::seconds(5));
-
-	// 断开连接
+	// 清理
+	inputThread.join();
 	networkManager.Disconnect();
 
 	return 0;
