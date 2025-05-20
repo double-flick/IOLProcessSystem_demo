@@ -1,19 +1,31 @@
+// FileDataSource.h
 #pragma once
-#pragma once
+
 #include "DataSource.h"
-#include <string>
 #include <vector>
+#include <string>
+#include <atomic>
+#include <thread>
 
 class FileDataSource : public DataSource {
 public:
 	explicit FileDataSource(const std::string& folderPath);
+	~FileDataSource();
 
-protected:
-	cv::Mat _FetchRawImage() override;
+	// 禁止拷贝
+	FileDataSource(const FileDataSource&) = delete;
+	FileDataSource& operator=(const FileDataSource&) = delete;
 
 private:
-	std::string _folderPath; // 图像文件夹路径
-	std::vector<std::string> _imageFiles; // 图像文件列表
+	void LoadImagePaths();                      // 加载文件夹中的图像路径
+	void PreloadCacheThreadFunc();              // 预加载缓存线程函数
+	cv::Mat _FetchRawImage() override;          // 实现基类的纯虚函数
 
-	void LoadImages(); // 加载文件夹中的所有图像文件
+	std::string _GetNextFilePath();             // 获取下一个要加载的文件路径
+
+	std::string _folderPath;                   // 图像文件夹路径
+	std::vector<std::string> _pendingImageFiles; // 待加载的图像文件列表
+	std::atomic<bool> _stopPreload{ false };    // 停止预加载标志
+	std::thread _preloadThread;                 // 预加载线程
+	std::mutex _fileListMutex;                  // 保护_pendingImageFiles的互斥锁
 };

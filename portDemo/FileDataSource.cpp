@@ -1,49 +1,78 @@
+// FileDataSource.cpp
 #include "FileDataSource.h"
 #include <opencv2/opencv.hpp>
 #include <filesystem>
 #include <iostream>
-#include <thread>
 #include <chrono>
-/*某种程度上算是DataSource.h的子类，重写了_FetchRawImage()方法，用于从文件夹中加载图片，以模拟输入场景*/
+
+namespace fs = std::experimental::filesystem;
 
 FileDataSource::FileDataSource(const std::string& folderPath)
 	: _folderPath(folderPath) {
-	LoadImages();
+	// 加载图像路径
+	LoadImagePaths();
 
-	// 打印文件夹路径和文件列表
-	std::cout << "Folder path: " << _folderPath << std::endl;
-	for (const auto& file : _imageFiles) {
-		std::cout << "Image file: " << file << std::endl;
+	// 启动预加载线程
+	_preloadThread = std::thread(&FileDataSource::PreloadCacheThreadFunc, this);
+}
+
+FileDataSource::~FileDataSource() {
+	// 停止预加载线程
+	_stopPreload = true;
+
+	// 等待线程结束
+	if (_preloadThread.joinable()) {
+		_preloadThread.join();
 	}
 }
 
+void FileDataSource::LoadImagePaths() {
+	try {
+		for (const auto& entry : fs::directory_iterator(_folderPath)) {
+			if (entry.path().extension() == ".png" ||
+				entry.path().extension() == ".jpg") {
+				std::lock_guard<std::mutex> lock(_fileListMutex);
+				_pendingImageFiles.push_back(entry.path().string());
+			}
+		}
+		std::cout << "Found " << _pendingImageFiles.size() << " images to load.\n";
+	}
+	catch (const fs::filesystem_error& e) {
+		std::cerr << "Failed to load image paths: " << e.what() << std::endl;
+	}
+}
+
+
 cv::Mat FileDataSource::_FetchRawImage() {
-	if (_imageFiles.empty()) {
-		// 如果没有更多图像，返回空图像
+	std::string filePath = _GetNextFilePath();
+	if (filePath.empty()) {
 		return cv::Mat();
 	}
 
-	// 获取下一个图像文件路径
-	std::string filePath = _folderPath + "/" + _imageFiles.front();
-	_imageFiles.erase(_imageFiles.begin());
-
-	// 读取图像
 	cv::Mat image = cv::imread(filePath);
 	if (image.empty()) {
-		std::cerr << "Failed to load image: " << filePath << std::endl;
+		std::cerr << "Failed to read image: " << filePath << std::endl;
 	}
-
-	// 在加载下一张图片之前等待1秒
-	std::this_thread::sleep_for(std::chrono::seconds(2));
-
+	
 	return image;
 }
 
-void FileDataSource::LoadImages() {
-	// 获取文件夹中的所有图像文件
-	for (const auto& entry : std::experimental::filesystem::directory_iterator(_folderPath)) {
-		if (entry.path().extension() == ".png") {
-			_imageFiles.push_back(entry.path().filename().string());
-		}
+std::string FileDataSource::_GetNextFilePath() {
+	std::lock_guard<std::mutex> lock(_fileListMutex);
+	if (_pendingImageFiles.empty()) {
+		return "";
+	}
+
+	std::string filePath = _pendingImageFiles.back();
+	_pendingImageFiles.pop_back();
+	return filePath;
+}
+
+void FileDataSource::PreloadCacheThreadFunc() {
+	while (!_stopPreload) {
+		// 直接调用基类的方法，它会处理缓存逻辑
+		// 等待一段时间再发送下一张图像
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+		FetchRawImageToCache();
 	}
 }

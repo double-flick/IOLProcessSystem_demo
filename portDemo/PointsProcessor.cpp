@@ -1,16 +1,12 @@
-// PointsProcessor.cpp
 #include "PointsProcessor.h"
 #include <iostream>
-#include <filesystem> // 用于创建目录
-
-/*回调函数，一旦接收到数据就触发，
-将接收到的数据解码为图像id和关键点坐标后，绘制并保存到本地，用于观察推理效果*/
+#include <filesystem>
+#include <opencv2/opencv.hpp>
 
 namespace fs = std::experimental::filesystem;
 
 PointsProcessor::PointsProcessor(DataSource& dataSource, const std::string& outputFolder)
 	: _dataSource(dataSource), _outputFolder(outputFolder) {
-
 	// 确保输出目录存在
 	if (!fs::exists(_outputFolder)) {
 		fs::create_directories(_outputFolder);
@@ -19,13 +15,13 @@ PointsProcessor::PointsProcessor(DataSource& dataSource, const std::string& outp
 
 void PointsProcessor::ProcessPointsPacket(const PointsPacket& packet) {
 	// 1. 从数据源缓存中获取原图
-	cv::Mat originalImage;
-	if (!_dataSource.GetOriginalImage(packet.imageId, originalImage)) {
+	cv::Mat originalImage = _dataSource.GetOriginalImage(packet.imageId);
+	if (originalImage.empty()) {
 		std::cerr << "警告：找不到图像ID对应的原图: " << packet.imageId << std::endl;
 		return;
 	}
 
-	// //2. 创建图像副本用于绘制（避免修改缓存中的原图）
+	//// 2. 创建图像副本用于绘制（避免修改缓存中的原图）
 	//cv::Mat imageWithPoints = originalImage.clone();
 
 	//// 3. 绘制坐标点到图像上
@@ -33,23 +29,19 @@ void PointsProcessor::ProcessPointsPacket(const PointsPacket& packet) {
 
 	//// 4. 生成保存路径并保存图像
 	//std::string outputPath = GenerateOutputPath(packet.imageId);
-	////std::cout << "输出路径: " << outputPath << std::endl;
 	//if (!cv::imwrite(outputPath, imageWithPoints)) {
 	//	std::cerr << "错误：无法保存图像到 " << outputPath << std::endl;
 	//}
 	//else {
-	//	//std::cout << "已保存处理后的图像到: " << outputPath << std::endl;
+	//	std::cout << "已保存处理后的图像到: " << outputPath << std::endl;
 	//}
 
-	// 5. 释放缓存
-	_dataSource.ReleaseImage(packet.imageId);
-
-	// 6. 记录并输出处理耗时
+	// 5. 记录并输出处理耗时
 	LogProcessingTime(packet.imageId);
 
-	// 7. 显示图像（可选）
-	//cv::imshow("处理结果预览", imageWithPoints);
-	//cv::waitKey(1);
+	// 6. 显示图像（可选）
+	// cv::imshow("处理结果预览", imageWithPoints);
+	// cv::waitKey(1);
 }
 
 void PointsProcessor::DrawPointsOnImage(const PointsPacket& packet, cv::Mat& image) {
@@ -78,9 +70,7 @@ void PointsProcessor::DrawPointsOnImage(const PointsPacket& packet, cv::Mat& ima
 			color = greenColor; // 最后7个点用绿色
 		}
 
-		cv::circle(image,
-			cv::Point(point.first, point.second),
-			radius, color, thickness);
+		cv::circle(image, cv::Point(point.first, point.second), radius, color, thickness);
 	}
 }
 
@@ -89,7 +79,6 @@ std::string PointsProcessor::GenerateOutputPath(const std::string& imageId) cons
 	return _outputFolder + "/" + imageId + "_points.jpg";
 }
 
-// 新增方法：计算并输出处理耗时
 void PointsProcessor::LogProcessingTime(const std::string& imageId) {
 	// 获取当前时间戳
 	auto now = std::chrono::high_resolution_clock::now();

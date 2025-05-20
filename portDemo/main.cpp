@@ -24,6 +24,9 @@ int main() {
 
 	// 创建数据源
 	FileDataSource dataSource(folderPath);
+	// 设置缓存容量
+	dataSource.SetCacheCapacity(50); // 设置缓存容量为50
+
 
 	// 创建网络管理器
 	NetworkManager networkManager;
@@ -51,6 +54,10 @@ int main() {
 
 	// 传输文件夹中的所有图像
 	while (true) {
+		// 先填充缓存
+		dataSource.FetchRawImageToCache();
+
+		// 然后从缓存获取图片
 		std::pair<cv::Mat, std::string> imagePair = dataSource.GetNextImage();
 		if (imagePair.first.empty()) {
 			break; // 如果没有更多图像，退出循环
@@ -62,8 +69,6 @@ int main() {
 		// 发送图像
 		protocolSender.Send(packet);
 
-		// 等待一段时间再发送下一张图像
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	}
 
 	// 等待接收线程结束
