@@ -1,4 +1,5 @@
-#include "FileDataSource.h"
+#include "VideoFlowDataSource.h"
+#include "VideoStreamSimulator.h"
 #include "ImageProcessor.h"
 #include "NetworkManager.h"
 #include "ProtocolSender.h"
@@ -11,8 +12,10 @@
 #include <chrono>
 #include <atomic>
 
+// 控制程序的运行状态
 std::atomic<bool> g_running{ true };
 
+// 模拟接收关键点数据包的回调函数
 void OnPointsPacketReceived(const PointsPacket& packet) {
 	std::cout << "Received PointsPacket for image ID: " << packet.imageId << std::endl;
 	for (const auto& point : packet.points) {
@@ -20,7 +23,7 @@ void OnPointsPacketReceived(const PointsPacket& packet) {
 	}
 }
 
-// 控制台输入监听线程
+// 控制台输入线程，按 'q' 停止程序
 void ConsoleInputThread() {
 	std::cout << "Press 'q' and Enter to stop the program..." << std::endl;
 	while (g_running) {
@@ -34,12 +37,17 @@ void ConsoleInputThread() {
 }
 
 int main() {
-	// 创建视频数据源 (10fps)
-	VideoDataSource videoSource("G:/AS-OCT/data/IOL/IOLvideos/2021-11-01_12-41-57__OCT.MP4", 1);
-	videoSource.EnableDebugOutput(true);
-	videoSource.SetCacheCapacity(100);
+	// 创建 VideoFlowDataSource 实例，用于模拟视频流
+	VideoFlowDataSource videoFlowDataSource(10.0); // 设置目标 FPS 为 10（实际使用时与目标帧率相关）
+	videoFlowDataSource.EnableDebugOutput(true); // 启用调试输出
 
-	// 创建网络管理器
+	 // 创建视频流模拟器，模拟从 60Hz 的 MP4 文件读取视频
+	VideoStreamSimulator videoSimulator("G:/AS-OCT/data/IOL/IOLvideos/2021-06-11_12-52-38__OCT.MP4", 60.0); // 设置目标帧率为 30Hz
+
+	// 启动视频流模拟器，开始模拟视频流的输入
+	videoSimulator.StartSimulation(videoFlowDataSource);
+
+	// 创建网络管理器，连接到服务器
 	NetworkManager networkManager;
 	if (!networkManager.Connect("172.27.246.211", 9999)) {
 		std::cerr << "Failed to connect to the server" << std::endl;
@@ -50,13 +58,12 @@ int main() {
 	ProtocolSender protocolSender(networkManager);
 	ProtocolReceiver protocolReceiver(networkManager);
 
-	// 设置输出目录
-	std::string outputFolder = "E:/WORK/mvs/projects/senderDemo/portDemo/processed_images";
-	PointsProcessor pointsProcessor(videoSource, outputFolder);
+	// 关键点处理器
+	PointsProcessor pointsProcessor;
 
-	// 设置消息回调函数
+	// 设置回调函数来处理接收到的关键点数据包
 	protocolReceiver.SetMessageCallback([&pointsProcessor](const PointsPacket& packet) {
-		pointsProcessor.ProcessPointsPacket(packet);
+		pointsProcessor.UpdatePoints(packet);
 	});
 
 	// 启动控制台输入线程
@@ -64,31 +71,34 @@ int main() {
 
 	// 主处理循环
 	while (g_running) {
-		// 尝试获取图像
-		videoSource.FetchRawImageToCache();
-		std::pair<cv::Mat, std::string> imagePair = videoSource.GetNextImage();
+		// 从 VideoFlowDataSource 获取要显示的图像
+		cv::Mat* displayImage = videoFlowDataSource.GetDisplayImage();
+		if (displayImage != nullptr) {
+			// 获取最新的关键点并绘制
+			pointsProcessor.DrawPointsOnDisplayImage(*displayImage);
 
+			// 显示图像
+			cv::imshow("Video Display", *displayImage);
+			cv::waitKey(1); // 显示图像
+		}
+		// 从缓存中抽取图像并发送到服务端处理
+		videoFlowDataSource.FetchRawImageToCache();
+		std::pair<cv::Mat, std::string> imagePair = videoFlowDataSource.GetNextImage();
 		if (!imagePair.first.empty()) {
-			// 编码并发送图像
+			// 编码并发送图像数据
 			ImagePacket packet = ImageProcessor::EncodeImage(imagePair.first, imagePair.second);
 			protocolSender.Send(packet);
 		}
 		else {
-			// 缓存为空时的处理
-
 			std::cout << "Waiting for video frames..." << std::endl;
-			
-
-			// 等待一段时间再重试
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 
-		// 添加小的延迟防止CPU占用过高
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		std::this_thread::sleep_for(std::chrono::milliseconds(1)); // 控制 CPU 占用
 	}
 
-	// 清理
-	inputThread.join();
+
+
 	networkManager.Disconnect();
 
 	return 0;

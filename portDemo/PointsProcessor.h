@@ -1,24 +1,25 @@
 #pragma once
 
-#include "DataSource.h"
 #include "PointsPacket.h"
 #include <opencv2/opencv.hpp>
 #include <string>
-#include <chrono> // 添加时间戳相关头文件
+#include <mutex>
 
 class PointsProcessor {
 public:
-	PointsProcessor(DataSource& dataSource, const std::string& outputFolder);
+	// 构造函数不再需要 DataSource 参数
+	PointsProcessor();
 
-	void ProcessPointsPacket(const PointsPacket& packet);
+	// 更新关键点集
+	void UpdatePoints(const PointsPacket& packet);
+
+	// 获取最新的关键点集
+	PointsPacket GetLatestPoints();
+
+	// 将关键点绘制到图像上
+	void DrawPointsOnDisplayImage(cv::Mat& displayImage);
 
 private:
-	DataSource& _dataSource;
-	std::string _outputFolder; // 输出目录路径
-
-	void DrawPointsOnImage(const PointsPacket& packet, cv::Mat& image);
-	std::string GenerateOutputPath(const std::string& imageId) const;
-
-	// 新增方法：计算并输出耗时
-	void LogProcessingTime(const std::string& imageId);
+	PointsPacket _latestPoints;  // 最新的关键点集
+	std::mutex _pointsMutex;  // 保护关键点集的互斥锁
 };
